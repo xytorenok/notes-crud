@@ -1,0 +1,5 @@
+{
+  "name": "NoteKeeper CRUD",
+  "description": "A high-performance, responsive notes application featuring secure authentication and full CRUD functionality for plain text notes. Optimized for a clean user experience with real-time feedback.",
+  "requestFramePermissions": []
+}
