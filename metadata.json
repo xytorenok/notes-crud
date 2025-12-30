@@ -1,5 +1,5 @@
 {
-  "name": "NoteKeeper CRUD",
-  "description": "A high-performance, responsive notes application featuring secure authentication and full CRUD functionality for plain text notes. Optimized for a clean user experience with real-time feedback.",
+  "name": "Vanilla NoteKeeper",
+  "description": "Pure HTML/CSS/JS CRUD application with Node.js backend logic ready for Render.com deployment.",
   "requestFramePermissions": []
 }
