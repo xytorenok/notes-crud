@@ -1,5 +1,5 @@
 {
-  "name": "Vanilla NoteKeeper",
-  "description": "Pure HTML/CSS/JS CRUD application with Node.js backend logic ready for Render.com deployment.",
+  "name": "NoteKeeper Real DB",
+  "description": "Full-stack Vanilla CRUD application with a Node.js/MongoDB backend and persistent user storage.",
   "requestFramePermissions": []
 }

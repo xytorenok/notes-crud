@@ -1,5 +1,5 @@
 
-// Frontend logic for NoteKeeper
+// Frontend logic for NoteKeeper - Real Database Version
 const authScreen = document.getElementById('auth-screen');
 const appScreen = document.getElementById('app-screen');
 const authForm = document.getElementById('auth-form');
@@ -16,9 +16,11 @@ let isLogin = true;
 let currentUser = JSON.parse(localStorage.getItem('user')) || null;
 
 // Initial state check
-if (currentUser) showApp();
+if (currentUser) {
+    showApp();
+}
 
-// --- Auth UI Logic ---
+// --- UI Toggle Logic ---
 toggleAuthBtn.onclick = () => {
     isLogin = !isLogin;
     authTitle.innerText = isLogin ? 'Вход' : 'Регистрация';
@@ -27,29 +29,29 @@ toggleAuthBtn.onclick = () => {
     authError.innerText = '';
 };
 
+// --- Authentication ---
 authForm.onsubmit = async (e) => {
     e.preventDefault();
+    authError.innerText = '';
     const email = document.getElementById('email').value;
     const password = document.getElementById('password').value;
 
-    // В демо-режиме (песочнице) имитируем сервер через LocalStorage
-    // В реальности здесь будет fetch('/api/auth/...')
+    const endpoint = isLogin ? '/api/auth/login' : '/api/auth/register';
+    
     try {
-        if (!isLogin) {
-            // Регистрация
-            let users = JSON.parse(localStorage.getItem('mock_users') || '[]');
-            if (users.find(u => u.email === email)) throw new Error('Пользователь уже существует');
-            const newUser = { id: Date.now().toString(), email, password };
-            users.push(newUser);
-            localStorage.setItem('mock_users', JSON.stringify(users));
-            loginUser(newUser);
-        } else {
-            // Вход
-            let users = JSON.parse(localStorage.getItem('mock_users') || '[]');
-            const user = users.find(u => u.email === email && u.password === password);
-            if (!user) throw new Error('Неверный логин или пароль');
-            loginUser(user);
+        const response = await fetch(endpoint, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ email, password })
+        });
+
+        const data = await response.json();
+        
+        if (!response.ok) {
+            throw new Error(data.error || 'Произошла ошибка');
         }
+
+        loginUser(data);
     } catch (err) {
         authError.innerText = err.message;
     }
@@ -66,6 +68,8 @@ logoutBtn.onclick = () => {
     currentUser = null;
     appScreen.classList.add('hidden');
     authScreen.classList.remove('hidden');
+    document.getElementById('email').value = '';
+    document.getElementById('password').value = '';
 };
 
 function showApp() {
@@ -74,49 +78,85 @@ function showApp() {
     renderNotes();
 }
 
-// --- Notes CRUD Logic ---
-saveNoteBtn.onclick = () => {
+// --- Notes CRUD ---
+async function renderNotes() {
+    if (!currentUser) return;
+    
+    try {
+        const response = await fetch(`/api/notes?userId=${currentUser.id || currentUser._id}`);
+        const notes = await response.json();
+        
+        if (!Array.isArray(notes)) {
+            notesList.innerHTML = '<div class="error-msg">Ошибка загрузки заметок</div>';
+            return;
+        }
+
+        if (notes.length === 0) {
+            notesList.innerHTML = '<div style="grid-column: 1/-1; text-align: center; color: var(--text-light); padding: 2rem;">Заметок пока нет...</div>';
+            return;
+        }
+
+        notesList.innerHTML = notes.map(note => `
+            <div class="note-card">
+                <div class="note-content">${escapeHTML(note.content)}</div>
+                <div class="note-footer">
+                    <span>${note.date}</span>
+                    <button class="delete-btn" onclick="deleteNote('${note._id}')">Удалить</button>
+                </div>
+            </div>
+        `).join('');
+    } catch (err) {
+        console.error("Fetch error:", err);
+    }
+}
+
+saveNoteBtn.onclick = async () => {
     const text = noteText.value.trim();
     if (!text) return;
 
-    const notes = JSON.parse(localStorage.getItem('mock_notes') || '[]');
-    const newNote = {
-        id: Date.now().toString(),
-        userId: currentUser.id,
-        content: text,
-        date: new Date().toLocaleString()
-    };
-    
-    notes.push(newNote);
-    localStorage.setItem('mock_notes', JSON.stringify(notes));
-    noteText.value = '';
-    renderNotes();
+    saveNoteBtn.disabled = true;
+    saveNoteBtn.innerText = 'Сохранение...';
+
+    try {
+        const response = await fetch('/api/notes', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+                userId: currentUser.id || currentUser._id,
+                content: text
+            })
+        });
+
+        if (response.ok) {
+            noteText.value = '';
+            await renderNotes();
+        }
+    } catch (err) {
+        console.error("Save error:", err);
+    } finally {
+        saveNoteBtn.disabled = false;
+        saveNoteBtn.innerText = 'Сохранить заметку';
+    }
 };
 
-function deleteNote(id) {
-    let notes = JSON.parse(localStorage.getItem('mock_notes') || '[]');
-    notes = notes.filter(n => n.id !== id);
-    localStorage.setItem('mock_notes', JSON.stringify(notes));
-    renderNotes();
+async function deleteNote(id) {
+    if (!confirm('Удалить эту заметку?')) return;
+    
+    try {
+        const response = await fetch(`/api/notes/${id}`, {
+            method: 'DELETE'
+        });
+
+        if (response.ok) {
+            renderNotes();
+        }
+    } catch (err) {
+        console.error("Delete error:", err);
+    }
 }
 
-window.deleteNote = deleteNote; // Make it global for inline onclick
-
-function renderNotes() {
-    const notes = JSON.parse(localStorage.getItem('mock_notes') || '[]')
-        .filter(n => n.userId === currentUser.id)
-        .reverse();
-
-    notesList.innerHTML = notes.map(note => `
-        <div class="note-card">
-            <div class="note-content">${escapeHTML(note.content)}</div>
-            <div class="note-footer">
-                <span>${note.date}</span>
-                <button class="delete-btn" onclick="deleteNote('${note.id}')">Удалить</button>
-            </div>
-        </div>
-    `).join('');
-}
+// Exposed to global scope for the inline onclick handler
+window.deleteNote = deleteNote;
 
 function escapeHTML(str) {
     const p = document.createElement('p');
